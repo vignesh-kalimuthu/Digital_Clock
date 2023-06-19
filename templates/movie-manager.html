@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Movie Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    input[type="text"],
+    input[type="submit"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    input[type="submit"] {
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    .success-message {
+      text-align: center;
+      color: green;
+      margin-bottom: 10px;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Movie Manager</h1>
+
+    <form id="add-movie-form">
+      <input type="text" name="movieTitle" placeholder="Movie title">
+      <input type="text" name="showTiming" placeholder="Show timing">
+      <input type="text" name="theaterName" placeholder="Theater name">
+      <input type="text" name="city" placeholder="City">
+      <input type="button" value="Add Movie" onclick="addMovie()">
+    </form>
+    
+
+    <form action="/search_movie" method="POST">
+      <input type="text" name="searchTerm" placeholder="Search movie">
+      <input type="submit" value="Search">
+    </form>
+    
+    {% if message %}
+    <div class="success-message">{{ message }}</div>
+    {% endif %}
+
+    <table id="movies-table">
+      <tr>
+        <th>Movie Title</th>
+        <th>Show Timing</th>
+        <th>Theater name</th>
+        <th>City</th>
+        <th>Action</th>
+      </tr>
+      {% for movie in movies %}
+      <tr id="movie-{{ movie[0] }}">
+        <td>{{ movie[1] }}</td>
+        <td>{{ movie[2] }}</td>
+        <td>{{ movie[3] }}</td>
+        <td>{{ movie[4] }}</td>
+        <td>
+          <div class="action-buttons">
+            <button class="delete-button" data-movie-id="{{ movie[0] }}" onclick="deleteMovie('{{ movie[0] }}')">Delete</button>
+            <button onclick="updateMovie('{{ movie[0] }}', '{{ movie[1] }}', '{{ movie[2] }}')">Update</button>
+            <button onclick="bookNow('{{ movie[0] }}')">Book Now</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    
+  </div>
+
+  
+    <script>
+      function addMovie() {
+        const movieTitle = document.querySelector('input[name="movieTitle"]').value;
+        const showTiming = document.querySelector('input[name="showTiming"]').value;
+        const theaterName = document.querySelector('input[name="theaterName"]').value;
+        const city = document.querySelector('input[name="city"]').value;
+      
+        if (movieTitle && showTiming && theaterName && city) {
+          // Create a new row with the data
+          const table = document.getElementById('movies-table');
+          const newRow = table.insertRow();
+          newRow.innerHTML = `
+            <td>${movieTitle}</td>
+            <td>${showTiming}</td>
+            <td>${theaterName}</td>
+            <td>${city}</td>
+            <td>
+              <div class="action-buttons">
+                <button class="delete-button" data-movie-id="" onclick="deleteMovie('')">Delete</button>
+                <button onclick="updateMovie('', '${movieTitle}', '${showTiming}', '${theaterName}', '${city}')">Update</button>
+                <button onclick="bookNow('')">Book Now</button>
+              </div>
+            </td>
+          `;
+      
+          // Store the data in the database
+          fetch('/add_movie', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              movieTitle: movieTitle,
+              showTiming: showTiming,
+              theaterName: theaterName,
+              city: city
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              // Display success message or perform any additional actions
+            } else {
+              alert(data.message); // Display error message if data couldn't be stored
+              table.deleteRow(newRow.rowIndex); // Remove the row from the table if data storage fails
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            table.deleteRow(newRow.rowIndex); // Remove the row from the table if an error occurs
+          });
+        } else {
+          alert('Please fill in all the form fields.');
+        }
+      }
+      
+      function deleteMovie(movieId) {
+        if (confirm("Are you sure you want to delete this movie?")) {
+          // Remove the row from the table immediately
+          const row = document.getElementById(`movie-${movieId}`);
+          row.parentNode.removeChild(row);
+    
+          fetch('/delete_movie', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ movieId: movieId })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (!data.success) {
+              // If deletion fails, add the row back to the table
+              const table = document.getElementById('movies-table');
+              const newRow = table.insertRow();
+              newRow.innerHTML = `
+                <td>${row.cells[0].innerHTML}</td>
+                <td>${row.cells[1].innerHTML}</td>
+                <td>${row.cells[2].innerHTML}</td>
+                <td>${row.cells[3].innerHTML}</td>
+              `;
+              alert(data.message);
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            // If an error occurs, add the row back to the table
+            const table = document.getElementById('movies-table');
+            const newRow = table.insertRow();
+            newRow.innerHTML = `
+              <td>${row.cells[0].innerHTML}</td>
+              <td>${row.cells[1].innerHTML}</td>
+              <td>${row.cells[2].innerHTML}</td>
+              <td>${row.cells[3].innerHTML}</td>
+            `;
+          });
+        }
+      }
+    
+      function updateMovie(movieId, currentMovieTitle, currentShowTiming, currentTheaterName, currentCity) {
+        const newMovieTitle = prompt("Enter the new movie title:", currentMovieTitle);
+        const newShowTiming = prompt("Enter the new show timing:", currentShowTiming);
+        const newTheaterName = prompt("Enter the new theater name:", currentTheaterName);
+        const newCity = prompt("Enter the new city:", currentCity);
+    
+        if (newMovieTitle && newShowTiming && newTheaterName && newCity) {
+          fetch('/update_movie', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              movieId,
+              newMovieTitle,
+              newShowTiming,
+              newTheaterName,
+              newCity
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              location.reload();
+            } else {
+              alert(data.message);
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+          });
+        }
+      }
+      
+      function bookNow(movieId) {
+        window.location.href = '/booking_form?movieId=' + movieId;
+      }
+      
+    </script>
+    
+  
+</body>
+</html>
